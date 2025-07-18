@@ -35,7 +35,7 @@ def main():
     metaxcan_dir = "/home/jupyter/MetaXcan"
 
     #build command based on parameters
-    if gwas_h2 is not None and gwas_N is not None:
+    if gwas_h2 is not None and gwas_N is not None and args.ref != "mesa":
         # Retrieve gtex reference files from bucket
         print("Retrieving GTEx reference files...")
         if not os.path.exists("/tmp/elastic-net-with-phi.tar"):
@@ -77,6 +77,30 @@ def main():
         #add sample size parameter if available
         if gwas_N is not None:
             cmd += f" \\\n    --gwas_N {gwas_N}"
+    elif args.ref == "mesa" or args.ref == "MESA":
+        #retrieve mesa filtered file from bucket
+        filename = args.pop + "_formatted_mesa_" + args.phecode + ".tsv"
+        get_command = "gsutil cp " + bucket + "/data/" + filename + " /tmp/"
+        os.system(get_command)
+
+        #copy MESA dbfiles to workspace
+        if not os.path.exists("/home/jupyter/mesa_dbfiles/MESA_EAS.txt.gz"):
+            ret = subprocess.run(f"gsutil cp -r {bucket}/data/mesa_dbfiles/ /home/jupyter/", shell=True)
+        
+        #command without optional parameters
+        cmd = f"{python_path} {metaxcan_dir}/software/SPrediXcan.py \
+        --gwas_file /tmp/{filename} \
+        --snp_column SNP \
+        --effect_allele_column ALT \
+        --non_effect_allele_column REF \
+        --beta_column BETA \
+        --se_column SE \
+        --model_db_path mesa_dbfiles/MESA_{args.pop}.db \
+        --covariance mesa_dbfiles/MESA_{args.pop}.txt.gz \
+        --keep_non_rsid \
+        --model_db_snp_key rsid \
+        --throw \
+        --output_file {output}"
     else:
         #retrieve gtex filtered file from bucket
         filename = args.pop + "_formatted_gtex_" + args.phecode + ".tsv"
